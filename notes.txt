@@ -1,0 +1,56 @@
+Each rule, R, defined in the grammar, becomes a method with the same name, and references to that rule become a method call: R(). The body of the method follows the flow of the body of the rule using the very same guidelines.
+
+Alternatives (a1 | a2 | aN) become an if-elif-else statement
+
+An optional grouping (…)* becomes a while statement that can loop over zero or more times
+
+Each token reference T becomes a call to the method eat: eat(T). The way the eat method works is that it consumes the token T if it matches the current lookahead token, then it gets a new token from the lexer and assigns that token to the current_token internal variable.
+
+
+For each level of precedence define a non-terminal. The body of a production for the non-terminal should contain arithmetic operators from that level and non-terminals for the next higher level of precedence.
+
+
+Create an additional non-terminal factor for basic units of expression, in our case, integers. The general rule is that if you have N levels of precedence, you will need N + 1 non-terminals in total: one non-terminal for each level plus one non-terminal for basic units of expression.
+
+
+// current grammar
+scope_statement: LEFTCURLY statement_block RIGHTCURLY
+statement_list: statement | statement SEMI statement_block
+statement: statement_block | assignment_statement | empty
+assignment_statement: let NAME ASSIGN expr
+expr: term((PLUS | MINUS) term)*
+term: factor((MUL | DIV) factor)*
+factor: PLUS factor | MINUS factor | INTEGER | LPAREN expr RPAREN | variable
+variale: ID
+NAME: text
+empty: :))
+
+
+
+//implementation hints
+expr {
+  fn expr() { self.factor(); }
+}
+
+(T1 | T2 | ...) {
+  if token.type == T1
+  elif token.type == T2
+  ...
+}
+
+(T1)* {
+  while current_token.type {
+    if current_token.type == T1 { ... }
+    else {
+      return UnexpectedToken
+    }
+  }
+}
+
+factor {
+  INTEGER
+}
+
+INTEGER {
+  self.eat(INTEGER)
+}
