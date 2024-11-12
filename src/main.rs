@@ -1,6 +1,5 @@
 use std::io::{self, BufRead};
 
-use errors::ParseError;
 use lexer::Lexer;
 use interpreter::Interpreter;
 use parser::Parser;
@@ -12,7 +11,8 @@ pub mod token;
 pub mod ast;
 pub mod errors;
 pub mod misc;
-
+pub mod symbols;
+pub mod object;
 
 
 fn main() {
@@ -29,8 +29,7 @@ fn main() {
             match inter.interpret() {
                 Ok(res) => println!("{:?}", res),
                 Err(e) => match e {
-                    ParseError::WaitForInput => append = true,
-                    _ => println!("{e}"),
+                    _ => println!("{:?}", e),
                 }
             }
         }

@@ -15,10 +15,10 @@ macro_rules! map(
     }
 );
 
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Number(i64),
+    Float(f64),
     Equal,
     Plus,
     Minus,
@@ -31,13 +31,21 @@ pub enum Token {
     Semicolon,
     Let,
     ID(String),
+    Colon,
+    Comma,
+    IntType,
+    FloatType,
+    Ret,
     EOF
 }
 
 
 lazy_static! {
     pub static ref RESERVED_KEYWORDS :HashMap<&'static str, Token> = map!{
-        "let" => Token::Let
+        "let" => Token::Let,
+        "int" => Token::IntType,
+        "float" => Token::FloatType,
+        "return" => Token::Ret
     };
 }
 

@@ -56,6 +56,15 @@ impl Lexer {
             self.advance();
         }
     }
+
+    fn skip_comment(&mut self) {
+        while let Some(c) = self.get_current_char() {
+            self.advance();
+            if c == '#' { break; }
+        }
+
+        self.advance();
+    }
     
     fn id(&mut self) -> Result<Token, ParseError> {
         let mut res = String::new();
@@ -73,20 +82,31 @@ impl Lexer {
     }
 
     //iterates over the adjecient digits returning the token with the whole number
-    fn integer(&mut self) -> Result<Token, ParseError> {
+    fn number(&mut self) -> Result<Token, ParseError> {
         let mut i :String = String::new();
+        let mut float :bool = false;
         while let Some(cur_char) = self.get_current_char() {
-            if !cur_char.is_digit(10) { break; }
+            if !float && cur_char == '.' {
+                float = true;
+            } else if !cur_char.is_digit(10) {
+                break;
+            }
+
             i.push(cur_char);
             self.advance();
         }
 
-        let number = match i.parse::<i64>() {
-            Ok(i) => i,
+        if float {
+            match i.parse::<f64>() {
+                Ok(i) => return Ok(Token::Float(i)),
+                Err(_) => return Err(ParseError::InternalError)
+            };
+        }
+
+        match i.parse::<i64>() {
+            Ok(i) => return Ok(Token::Number(i)),
             Err(_) => return Err(ParseError::InternalError)
         };
-
-        Ok(Token::Number(number))
     }
 
     //Lexical Analyzer; breaks the sentence into tokens, returns the next token in the stream
@@ -110,9 +130,14 @@ impl Lexer {
                 }
             }
 
+            if cur_char == '#' {
+                self.skip_comment();
+                continue;
+            }
+
             let pos = self.pos;
 
-            define_token!(cur_char.is_digit(10), return self.integer());
+            define_token!(cur_char.is_digit(10), return self.number());
             define_token!(cur_char.is_alphanumeric(), return self.id());
 
             defer!(self.advance());
@@ -126,7 +151,9 @@ impl Lexer {
                 '{' => LeftCurly,
                 '}' => RightCurly,
                 '=' => Equal,
-                ';' => Semicolon
+                ';' => Semicolon,
+                ':' => Colon,
+                ',' => Comma
             }
 
             return Err(ParseError::UnknownToken(pos, cur_char));

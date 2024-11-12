@@ -1,4 +1,4 @@
-use crate::ast::ast::Expr;
+use crate::ast::ast::{BlockStmt, Stmt, Expr};
 use crate::token::Token;
 use crate::errors::ParseError;
 use crate::lexer::Lexer;
@@ -37,7 +37,7 @@ impl Parser {
     }
 
 
-    fn scope_statement(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn scope_statement(&mut self) -> Result<BlockStmt, ParseError> {
         self.eat(Token::LeftCurly)?;
         let nodes = self.statement_block()?;
         self.eat(Token::RightCurly)?;
@@ -45,9 +45,9 @@ impl Parser {
         Ok(nodes)
     }
 
-    fn statement_block(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn statement_block(&mut self) -> Result<BlockStmt, ParseError> {
         let node = self.statement()?;
-        let mut res :Vec<Box<Expr>> = vec![node];
+        let mut res :Vec<Stmt> = vec![node];
 
         while self.current_token == Token::Semicolon {
             self.eat(Token::Semicolon)?;
@@ -58,29 +58,29 @@ impl Parser {
             return Err(ParseError::UnexpectedToken(self.lexer.pos, self.current_token.clone()))
         }
 
-        return Ok(Box::new(Expr::Scope(res)));
+        return Ok(BlockStmt { statements: res });
     }
 
-    fn empty() -> Box<Expr> {
-        Box::new(Expr::NoOp)
+    fn empty() -> Expr {
+        Expr::Noop
     }
 
-    fn statement(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn statement(&mut self) -> Result<Stmt, ParseError> {
         return match &self.current_token {
-            Token::LeftCurly => self.scope_statement(),
+            Token::LeftCurly => Ok(Stmt::Block(self.statement_block()?)),
             Token::Let => self.assignment_statement(),
-            Token::LeftParen => self.factor(),
-            _ => Ok(Parser::empty())
+            Token::Ret =>  { self.eat(Token::Ret)?; Ok(Stmt::Return(*self.expr()?)) },
+            _ => Ok(Stmt::Expr(Parser::empty()))
         }
     }
 
-    fn assignment_statement(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn assignment_statement(&mut self) -> Result<Stmt, ParseError> {
         self.eat(Token::Let)?;
         let left = self.variable()?;
         self.eat(Token::Equal)?;
         let right = self.expr()?;
 
-        Ok(Box::new(Expr::Assign(left, right)))
+        Ok(Stmt::Let(*left, *right))
     }
 
     fn variable(&mut self) -> Result<Box<Expr>, ParseError> {
@@ -104,27 +104,20 @@ impl Parser {
             return Ok(Box::new(Expr::NumLit(n)));
         }
 
-        if let Minus = old_token {
-            self.eat(Minus)?;
-            return Ok(Box::new(Expr::UnaryMinus(self.factor()?)))
+        if let Float(f) = old_token {
+            self.eat(Float(f))?;
+            return Ok(Box::new(Expr::FloatLit(f)));
         }
 
-        if let Plus = old_token {
-            self.eat(Plus)?;
-            return Ok(Box::new(Expr::UnaryPlus(self.factor()?)))
+        if let Minus = old_token {
+            self.eat(Minus)?;
+            return Ok(Box::new(Expr::Prefix(old_token, self.factor()?)))
         }
 
         if let LeftParen = old_token {
             self.eat(LeftParen)?;
             let res = self.expr()?;
             self.eat(RightParen)?;
-            return Ok(res);
-        }
-
-        if let LeftCurly = old_token {
-            //self.eat(LeftCurly)?;
-            let res = self.scope_statement()?;
-            //self.eat(RightCurly)?;
             return Ok(res);
         }
         
@@ -137,15 +130,9 @@ impl Parser {
         let mut node = self.factor()?;
 
         while self.current_token.is(&[Multiply, Divide]) {
-            let token = &self.current_token;
-
-            if let Multiply = token {
-                self.eat(Multiply)?;
-                node = Box::new(Expr::Mult(node, self.factor()?));
-            } else if let Divide = token {
-                self.eat(Divide)?;
-                node = Box::new(Expr::Div(node, self.factor()?));
-            }
+            let token = self.current_token.clone();
+            self.eat(token.clone())?;
+            node = Box::new(Expr::Infix(node, token, self.factor()?));
         }
 
         Ok(node)
@@ -157,23 +144,17 @@ impl Parser {
         
         let mut node = self.term()?;
         while self.current_token.is(&[Plus, Minus]) {
-            let token = &self.current_token;
-
-            if let Plus = token {
-                self.eat(Plus)?;
-                node = Box::new(Expr::Add(node, self.term()?))
-            } else if let Minus = token {
-                self.eat(Minus)?;
-                node = Box::new(Expr::Sub(node, self.term()?))
-            }
+            let token = self.current_token.clone();
+            self.eat(token.clone())?;
+            node = Box::new(Expr::Infix(node, token, self.factor()?));
         }
 
         Ok(node)
     }
 
-    pub fn parse(&mut self) -> Result<Box<Expr>, ParseError> {
-        let program = self.scope_statement()?;
-        if self.current_token != Token::EOF { return Err(ParseError::InternalError) }
+    pub fn parse(&mut self) -> Result<BlockStmt, ParseError> {
+        let program = self.statement_block()?;
+        if self.current_token != Token::EOF { return Err(ParseError::WrongToken(self.lexer.pos, Token::EOF, self.current_token.clone())) }
 
         Ok(program)
     }

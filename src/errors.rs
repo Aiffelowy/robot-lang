@@ -11,7 +11,8 @@ pub enum ParseError {
     UnexpectedToken(usize, Token),
     UninitializedValue,
     InternalError,
-    WaitForInput
+    WaitForInput,
+    UndefinedSymbol(String)
 }
 
 impl fmt::Display for ParseError {
@@ -23,6 +24,7 @@ impl fmt::Display for ParseError {
             Self::UninitializedValue => format!("Uninitialized value accessed"),
             Self::InternalError => "Internal Error".to_string(),
             Self::WaitForInput => "".to_string(),
+            Self::UndefinedSymbol(sn) => sn.to_string()
         };
 
         write!(f, "{fmt_str}")
