@@ -17,9 +17,10 @@ Create an additional non-terminal factor for basic units of expression, in our c
 scope_statement: LEFTCURLY statement_block RIGHTCURLY
 statement_list: statement | statement SEMI statement_block
 statement: statement_block | assignment_statement | empty
-assignment_statement: let NAME ASSIGN expr
+assignment_statement: let type_delc NAME ASSIGN expr
 expr: term((PLUS | MINUS) term)*
 term: factor((MUL | DIV) factor)*
+type_delc: COLON (int | float)
 factor: PLUS factor | MINUS factor | INTEGER | LPAREN expr RPAREN | variable
 variale: ID
 NAME: text

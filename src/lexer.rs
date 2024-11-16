@@ -58,9 +58,10 @@ impl Lexer {
     }
 
     fn skip_comment(&mut self) {
+        self.advance();
         while let Some(c) = self.get_current_char() {
+            if c == '#' || c == '\n' { break; }
             self.advance();
-            if c == '#' { break; }
         }
 
         self.advance();
@@ -132,6 +133,7 @@ impl Lexer {
 
             if cur_char == '#' {
                 self.skip_comment();
+                self.skip_whitespace();
                 continue;
             }
 

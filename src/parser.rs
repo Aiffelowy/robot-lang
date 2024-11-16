@@ -67,7 +67,7 @@ impl Parser {
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         return match &self.current_token {
-            Token::LeftCurly => Ok(Stmt::Block(self.statement_block()?)),
+            Token::LeftCurly => Ok(Stmt::Block(self.scope_statement()?)),
             Token::Let => self.assignment_statement(),
             Token::Ret =>  { self.eat(Token::Ret)?; Ok(Stmt::Return(*self.expr()?)) },
             _ => Ok(Stmt::Expr(Parser::empty()))

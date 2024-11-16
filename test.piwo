@@ -1,8 +1,0 @@
-{
-  let among = 420;
-  let sus = {
-    ((among+4)*3)
-  };
-
-  (among+sus)
-}
