@@ -36,6 +36,7 @@ pub enum Token {
     IntType,
     FloatType,
     Ret,
+    Mutable,
     EOF
 }
 
@@ -43,9 +44,10 @@ pub enum Token {
 lazy_static! {
     pub static ref RESERVED_KEYWORDS :HashMap<&'static str, Token> = map!{
         "let" => Token::Let,
-        "int" => Token::IntType,
-        "float" => Token::FloatType,
-        "return" => Token::Ret
+//        "int" => Token::IntType,
+//        "float" => Token::FloatType,
+        "return" => Token::Ret,
+        "mut" => Token::Mutable
     };
 }
 

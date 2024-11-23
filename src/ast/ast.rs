@@ -1,10 +1,27 @@
 use crate::token::Token;
+use std::fmt::{ Display, Formatter };
 
 pub enum Stmt {
     Expr(Expr),
     Block(BlockStmt),
-    Let(Expr, Expr),
+    Let(Expr, Type, Expr),
+    Assign(Expr, Expr),
     Return(Expr),
+}
+
+type Mutable = bool;
+
+
+#[derive(Clone, Debug)]
+pub struct Type {
+    pub t: String,
+    pub mutable: bool
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.t)
+    }
 }
 
 pub struct BlockStmt {
@@ -26,4 +43,3 @@ pub enum Expr {
     Var(String),
     Noop,
 }
-

@@ -1,4 +1,4 @@
-use crate::ast::ast::{BlockStmt, Stmt, Expr};
+use crate::ast::ast::{BlockStmt, Expr, Stmt, Type};
 use crate::token::Token;
 use crate::errors::ParseError;
 use crate::lexer::Lexer;
@@ -68,19 +68,53 @@ impl Parser {
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         return match &self.current_token {
             Token::LeftCurly => Ok(Stmt::Block(self.scope_statement()?)),
-            Token::Let => self.assignment_statement(),
+            Token::Let => self.vardecl_statement(),
+            Token::ID(_) => self.assignment_statement(),
             Token::Ret =>  { self.eat(Token::Ret)?; Ok(Stmt::Return(*self.expr()?)) },
             _ => Ok(Stmt::Expr(Parser::empty()))
         }
     }
 
     fn assignment_statement(&mut self) -> Result<Stmt, ParseError> {
+        let v = self.variable()?;
+        self.eat(Token::Equal)?;
+        let expr = self.expr()?;
+        Ok(Stmt::Assign(*v, *expr))
+    }
+
+    fn type_decl(&mut self) -> Result<Type, ParseError> {
+        use Token::*;
+
+        self.eat(Colon)?;
+        let mut old_token = self.current_token.clone();
+        let mut mutable = false;
+
+        if let Mutable = old_token {
+            self.eat(Mutable)?;
+            mutable = true;
+            old_token = self.current_token.clone();
+        }
+
+        if let ID(id) = old_token {
+            self.eat(ID(id.clone()))?;
+            return Ok(Type{ t: id, mutable })
+        }
+        
+        return Err(ParseError::WrongToken(self.lexer.pos, old_token, Token::ID("".to_string())))
+    }
+
+    fn vardecl_statement(&mut self) -> Result<Stmt, ParseError> {
         self.eat(Token::Let)?;
         let left = self.variable()?;
-        self.eat(Token::Equal)?;
-        let right = self.expr()?;
+        let t = self.type_decl()?;
 
-        Ok(Stmt::Let(*left, *right))
+        if let Token::Equal = &self.current_token {
+            self.eat(Token::Equal)?;
+            let right = self.expr()?;
+            return Ok(Stmt::Let(*left, t, *right))
+        }
+
+        Ok(Stmt::Let(*left, t, Parser::empty()))
     }
 
     fn variable(&mut self) -> Result<Box<Expr>, ParseError> {

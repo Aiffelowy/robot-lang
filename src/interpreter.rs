@@ -3,6 +3,7 @@ use crate::object::Object;
 use crate::{ast::ast::*, parser::Parser};
 use std::collections::HashMap;
 use crate::token::Token;
+use crate::symbols::{self, SymbolTableBuilder};
 
 #[derive(Debug)]
 pub enum InterpreterError {
@@ -12,20 +13,22 @@ pub enum InterpreterError {
 
 pub struct Interpreter {
     parser: Parser,
+    symtable: SymbolTableBuilder,
     global_scope: HashMap<String, Object>
 }
 
 
 impl Interpreter {
     pub fn new(parser: Parser) -> Self {
-        Self { parser, global_scope: HashMap::new() } }
+        Self { parser, global_scope: HashMap::new(), symtable: SymbolTableBuilder::new() } }
 
     pub fn interpret(&mut self) -> Result<Object, InterpreterError> {
         let tree = match self.parser.parse() {
             Ok(tree) => tree,
             Err(e) => return Err(InterpreterError::ParseError(e))
         };
-
+        
+        self.symtable.check(&tree);
         Ok(self.visit_block_stmt(&tree)?)
     }
 
@@ -118,7 +121,14 @@ impl Interpreter {
             Expr(ref expr) => self.visit_expr(expr),
             Return(ref expr) => Ok(Object::Return(Box::new(self.visit_expr(expr)?))),
             Block(ref stmts) => { self.visit_block_stmt(stmts) }
-            Let(ref var, ref expr) => {
+            Let(ref var, _, ref expr) => {
+                if let crate::ast::ast::Expr::Var(id) = var {
+                    self.global_scope.insert(id.to_string(), self.visit_expr(expr)?);
+                    return Ok(Object::Null);
+                }
+                Err(InterpreterError::SomeError)
+            }
+            Assign(ref var, ref expr) => {
                 if let crate::ast::ast::Expr::Var(id) = var {
                     self.global_scope.insert(id.to_string(), self.visit_expr(expr)?);
                     return Ok(Object::Null);
