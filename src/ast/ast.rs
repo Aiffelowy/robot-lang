@@ -9,18 +9,37 @@ pub enum Stmt {
     Return(Expr),
 }
 
-type Mutable = bool;
-
-
 #[derive(Clone, Debug)]
 pub struct Type {
-    pub t: String,
+    pub t: Token,
     pub mutable: bool
+}
+
+impl PartialEq for Type {
+    fn eq(&self, t: &Type) -> bool {
+        if self.t == t.t { return true }
+        false
+    }
 }
 
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.t)
+        use Token::*;
+
+        let s = match self.t {
+            IntType => "int",
+            FloatType => "float",
+            ID(ref s) => s,
+            _ => unreachable!()
+        };
+
+        write!(f, "{s}")
+    }
+}
+
+impl Type {
+    pub fn new(t: Token, mutable: bool) -> Self {
+        Self { t, mutable }
     }
 }
 

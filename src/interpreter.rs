@@ -3,12 +3,13 @@ use crate::object::Object;
 use crate::{ast::ast::*, parser::Parser};
 use std::collections::HashMap;
 use crate::token::Token;
-use crate::symbols::{self, SymbolTableBuilder};
+use crate::symbols::{self, SymbolError, SymbolTableBuilder};
 
 #[derive(Debug)]
 pub enum InterpreterError {
     SomeError,
-    ParseError(ParseError)
+    ParseError(ParseError),
+    SymbolError(SymbolError)
 }
 
 pub struct Interpreter {
@@ -28,7 +29,10 @@ impl Interpreter {
             Err(e) => return Err(InterpreterError::ParseError(e))
         };
         
-        self.symtable.check(&tree);
+        match self.symtable.check(&tree) {
+            Ok(()) => (),
+            Err(e) => return Err(InterpreterError::SymbolError(e))
+        }
         Ok(self.visit_block_stmt(&tree)?)
     }
 

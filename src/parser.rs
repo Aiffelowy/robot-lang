@@ -95,9 +95,14 @@ impl Parser {
             old_token = self.current_token.clone();
         }
 
+        if old_token.is(&[IntType, FloatType]) {
+            self.eat(old_token.clone())?;
+            return Ok(Type::new(old_token, mutable));
+        }
+
         if let ID(id) = old_token {
             self.eat(ID(id.clone()))?;
-            return Ok(Type{ t: id, mutable })
+            return Ok(Type{ t: Token::ID(id), mutable })
         }
         
         return Err(ParseError::WrongToken(self.lexer.pos, old_token, Token::ID("".to_string())))

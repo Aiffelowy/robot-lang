@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use crate::ast::ast::{BlockStmt, Expr, Stmt, Type};
+use crate::token::Token;
 
 macro_rules! map(
     { $($key:expr => $value:expr),+ } => {
@@ -13,9 +14,12 @@ macro_rules! map(
     }
 );
 
-enum SymbolError {}
+#[derive(Debug)]
+pub enum SymbolError {
+    SomeError
+}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Symbol {
     Type(Type),
     Var(String, Box<Symbol>),
@@ -31,9 +35,9 @@ impl SymbolTable {
 
     pub fn new() -> Self {
         Self { table: map!(
-            "int".to_string() => Symbol::Type(Type { t: "int".to_string(), mutable: false }),
-            "float".to_string() => Symbol::Type(Type { t: "float".to_string(), mutable: false }),
-            "null".to_string() => Symbol::Type(Type{ t: "null", mutable: false })
+            "int".to_string() => Symbol::Type(Type::new(Token::IntType, false)),
+            "float".to_string() => Symbol::Type(Type::new(Token::FloatType, false)),
+            "null".to_string() => Symbol::Type(Type::new(Token::Null, false))
         ) }
     }
 
@@ -60,65 +64,91 @@ impl SymbolTableBuilder {
         Self { symtable: SymbolTable::new() }
     }
 
-    fn visit_block(&mut self, blk: &BlockStmt) {
-        for stmt in &blk.statements { self.visit_stmt(stmt) }
+    fn visit_block(&mut self, blk: &BlockStmt) -> Result<(), SymbolError> {
+        for stmt in &blk.statements { self.visit_stmt(stmt)? }
+        Ok(())
+    }
+
+    fn visit_infix(lhs: &Symbol, rhs: &Symbol) -> Result<Symbol, SymbolError> {
+        if lhs == rhs { return Ok(lhs.clone()) }
+        Err(SymbolError::SomeError)
+    }
+
+    fn visit_prefix(rhs: &Symbol) -> Result<Symbol, SymbolError> {
+        Ok(rhs.clone())
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> Result<Symbol, SymbolError> {
         use Expr::*;
 
         match expr {
-            NumLit(_) => Ok(Symbol::Type(Type{t: "int", mutable: false})),
-            FloatLit(_) => Ok(Symbol::Type(Type{t: "float", mutable: false})),
-            Noop => (),
+            NumLit(_) => Ok(Symbol::Type(Type::new(Token::IntType, false))),
+            FloatLit(_) => Ok(Symbol::Type(Type::new(Token::FloatType, false))),
+            Noop => Ok(Symbol::Type(Type::new(Token::Null, false))),
 
             Var(ref var_id) => {
                 match self.symtable.lookup(var_id) {
-                    None => println!("GOOD"),
-                    _ => ()
+                    None => Err(SymbolError::SomeError),
+                    Some(s) => Ok(s.clone())
                 }
             }
 
-            Infix(ref lhs, _, ref rhs) => { self.visit_expr(lhs); self.visit_expr(rhs) }
-            Prefix(_, ref rhs) => { self.visit_expr(rhs) }
+            Infix(ref lhs, _, ref rhs) => { 
+                let l = self.visit_expr(lhs)?;
+                let r = self.visit_expr(rhs)?;
+                Self::visit_infix(&l, &r)
+            }
+            Prefix(_, ref rhs) => {
+                let r = self.visit_expr(rhs)?;
+                Self::visit_prefix(&r)
+            }
         }
     }
 
-    fn visit_stmt(&mut self, statement: &Stmt) {
+    fn visit_stmt(&mut self, statement: &Stmt) -> Result<(), SymbolError> {
         match statement {
-            Stmt::Expr(ref expr) => self.visit_expr(expr),
+            Stmt::Expr(ref expr) => { self.visit_expr(expr)?; Ok(()) },
             Stmt::Block(ref blk) => self.visit_block(blk),
             Stmt::Let(ref lhs, ref t, ref rhs) => { 
                 if let Expr::Var(name) = lhs {
-                    match self.symtable.lookup(&t.to_string()) {
-                        None => println!("yeah"),
-                        _ => ()
-                    }
+                    let var_symbol = match self.symtable.lookup(&t.to_string()) {
+                        None => return Err(SymbolError::SomeError),
+                        Some(s) => s.clone()
+                    };
 
+                    let expr_symbol = self.visit_expr(rhs)?;
+                    if var_symbol != expr_symbol { return Err(SymbolError::SomeError) }
                     self.symtable.define(Symbol::Var(name.clone(), Box::new(Symbol::Type(t.clone()))));
                 }
 
-                self.visit_expr(rhs)
+                Ok(())
             },
-            Stmt::Return(ref expr) => self.visit_expr(expr),
-            Stmt::Assign(ref lhs, _) => {
+            Stmt::Return(ref expr) => { self.visit_expr(expr)?; Ok(()) },
+            Stmt::Assign(ref lhs, ref rhs) => {
                 if let Expr::Var(name) = lhs {
-                    match self.symtable.lookup(&name) {
-                        None => println!("GOOOOOOOD"),
+                    let var_symbol = match self.symtable.lookup(&name) {
+                        None => return Err(SymbolError::SomeError),
                         Some(s) => match s {
-                                Symbol::Var(_, s) => match **s {
-                                    Symbol::Type(ref t) => if !t.mutable { println!("GOTEM"); }
-                                    _ => unreachable!(),
-                                }
+                                Symbol::Var(_, s) => *s.clone(),
                                 _ => unreachable!()
                         }
+                    };
+                    
+                    if let Symbol::Type(ref t) = var_symbol {
+                        if !t.mutable { return Err(SymbolError::SomeError) }
                     }
+
+                    let expr_symbol = self.visit_expr(rhs)?;
+                    if var_symbol != expr_symbol { return Err(SymbolError::SomeError) }
                 }
+
+                Ok(())
             }
         }
     }
 
-    pub fn check(&mut self, ast: &BlockStmt) -> () {
-        self.visit_block(ast);
+    pub fn check(&mut self, ast: &BlockStmt) -> Result<(), SymbolError> {
+        self.visit_block(ast)?;
+        Ok(())
     }
 }
